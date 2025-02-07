@@ -43,16 +43,12 @@ jobs:
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu" >> $GITHUB_ENV
 
-      - name: Debug Toolchain Path
+      - name: Clean Kernel Build Directory
         run: |
-          echo "Toolchain path: $TOOLCHAIN_DIR"
-          ls -la $TOOLCHAIN_DIR
-
-      - name: Clean Build Directory
-        run: |
-          make O=$KERNEL_OUT clean || true
+          make mrproper
+          make clean
 
       - name: Compile Kernel with KernelSU
         run: |
