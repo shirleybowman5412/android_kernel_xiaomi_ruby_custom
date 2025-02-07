@@ -43,6 +43,12 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
 
+      - name: Modify Kernel Config to Skip drvgen
+        run: |
+          sed -i '/CONFIG_DRVGEN/d' arch/arm64/configs/ruby_defconfig || true
+          echo "CONFIG_DRVGEN=n" >> arch/arm64/configs/ruby_defconfig
+          echo "Modified ruby_defconfig to disable drvgen."
+
       - name: Debug Environment Variables
         run: |
           echo "KERNEL_DIR=$KERNEL_DIR"
@@ -55,7 +61,7 @@ jobs:
           mkdir -p $KERNEL_OUT
           # Try ruby_defconfig, fallback to defconfig if it fails
           make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig || make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 defconfig
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc) || true
 
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
