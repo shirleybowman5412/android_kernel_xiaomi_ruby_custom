@@ -25,10 +25,10 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Setup Clang Toolchain
+      - name: Setup Clang Toolchain (Arter97)
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://commondatastorage.googleapis.com/android-kernel-clang/clang-r450784e.tar.gz -O clang.tar.gz
+          wget https://github.com/arter97/arm64-clang/releases/latest/download/arm64-clang.tar.gz -O clang.tar.gz
           tar -xzf clang.tar.gz
           cd ..
 
@@ -36,7 +36,7 @@ jobs:
         run: |
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
-          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang-r450784e" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/arm64-clang" >> $GITHUB_ENV
 
       - name: Compile Kernel with KernelSU
         run: |
