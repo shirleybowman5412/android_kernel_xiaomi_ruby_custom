@@ -28,7 +28,7 @@ jobs:
       - name: Setup Proton Clang Toolchain (Faster)
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://github.com/kdrag0n/proton-clang/releases/latest/download/proton-clang.tar.gz -O clang.tar.gz
+          wget https://github.com/kdrag0n/proton-clang/releases/download/20210522/proton-clang.tar.gz -O clang.tar.gz
           tar -xzf clang.tar.gz
           cd ..
 
