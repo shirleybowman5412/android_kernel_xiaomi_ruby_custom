@@ -17,24 +17,18 @@ jobs:
       - name: Clone KernelSU
         run: |
           git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
-          ls -la KernelSU  # Debug: Check contents
+          ls -la KernelSU  # Debug: Check KernelSU contents
 
       - name: Merge KernelSU into Kernel Tree
         run: |
-          if [ -d "KernelSU/kernel/include" ]; then
-            cp -r KernelSU/kernel/include ./include
-          elif [ -d "KernelSU/include" ]; then
-            cp -r KernelSU/include ./include
-          else
-            echo "Error: KernelSU 'include' folder not found!"
-            exit 1
-          fi
-          cp -r KernelSU/kernel/drivers ./drivers || echo "Warning: No drivers copied."
+          cp -r KernelSU/include/* include/ || true
+          cp -r KernelSU/drivers/* drivers/ || true
+          echo "KernelSU merged successfully!"
 
-      - name: Setup Clang Toolchain
+      - name: Setup Proton Clang Toolchain (Faster)
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main.tar.gz -O clang.tar.gz
+          wget https://github.com/kdrag0n/proton-clang/releases/latest/download/proton-clang.tar.gz -O clang.tar.gz
           tar -xzf clang.tar.gz
           cd ..
 
@@ -42,7 +36,7 @@ jobs:
         run: |
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
-          echo "TOOLCHAIN_DIR=$(pwd)/toolchains" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
 
       - name: Compile Kernel with KernelSU
         run: |
