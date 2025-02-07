@@ -15,31 +15,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clone KernelSU
-        run: git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
+        run: |
+          git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
+          ls -la KernelSU  # Debug: Check contents
 
       - name: Merge KernelSU into Kernel Tree
         run: |
-          cd KernelSU
-          cp -r include ../include
-          cp -r drivers ../drivers
-          cd ..
+          if [ -d "KernelSU/kernel" ]; then
+            cp -r KernelSU/kernel/* .
+            echo "KernelSU merged successfully!"
+          else
+            echo "Error: KernelSU structure is different!"
+            ls -la KernelSU  # Debug: Show actual structure
+            exit 1
+          fi
 
       - name: Setup Clang Toolchain
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/main.tar.gz
-          tar -xzf main.tar.gz
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main.tar.gz -O clang.tar.gz
+          tar -xzf clang.tar.gz
           cd ..
 
       - name: Set Environment Variables
         run: |
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
-          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang-r450784d" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains" >> $GITHUB_ENV
 
       - name: Compile Kernel with KernelSU
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
+          mkdir -p $KERNEL_OUT
           make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
           make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
 
