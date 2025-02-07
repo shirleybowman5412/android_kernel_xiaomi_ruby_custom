@@ -1,0 +1,50 @@
+name: KernelSU Build for Redmi Note 12 Pro Plus
+
+on:
+  push:
+    branches:
+      - "12.1"  # Change if needed
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+
+      - name: Clone KernelSU
+        run: git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
+
+      - name: Merge KernelSU into Kernel Tree
+        run: |
+          cd KernelSU
+          cp -r include ../include
+          cp -r drivers ../drivers
+          cd ..
+
+      - name: Setup Clang Toolchain
+        run: |
+          mkdir -p toolchains && cd toolchains
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/main.tar.gz
+          tar -xzf main.tar.gz
+          cd ..
+
+      - name: Set Environment Variables
+        run: |
+          echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
+          echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang-r450784d" >> $GITHUB_ENV
+
+      - name: Compile Kernel with KernelSU
+        run: |
+          export PATH=$TOOLCHAIN_DIR/bin:$PATH
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+
+      - name: Upload Compiled Kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-Built
+          path: ${{ env.KERNEL_OUT }}/arch/arm64/boot/Image.gz-dtb
