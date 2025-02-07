@@ -47,10 +47,13 @@ jobs:
           echo "Toolchain path: $TOOLCHAIN_DIR"
           ls -la $TOOLCHAIN_DIR
 
-      - name: Clean Build Directory
+      - name: Debug Missing Files
         run: |
-          make mrproper
-          make O=$KERNEL_OUT clean
+          ls -la drivers/input/touchscreen/
+
+      - name: Clean Build Directory (Without mrproper)
+        run: |
+          make O=$KERNEL_OUT clean || true
 
       - name: Compile Kernel with KernelSU
         run: |
