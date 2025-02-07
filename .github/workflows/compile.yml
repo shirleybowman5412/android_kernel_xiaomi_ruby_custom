@@ -25,10 +25,10 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Setup Proton Clang Toolchain (Fixed Link)
+      - name: Setup Proton Clang Toolchain (Faster)
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://github.com/kdrag0n/proton-clang/releases/download/20221210/proton-clang.tar.gz -O clang.tar.gz
+          wget https://github.com/kdrag0n/proton-clang/releases/download/20231210/proton-clang.tar.gz -O clang.tar.gz
           tar -xzf clang.tar.gz
           cd ..
 
@@ -37,18 +37,10 @@ jobs:
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
-          echo "PATH=$TOOLCHAIN_DIR/bin:$PATH" >> $GITHUB_ENV
-
-      - name: Check & Fix Missing Touchscreen Driver
-        run: |
-          if [ ! -d "drivers/input/touchscreen/nt36572_common" ]; then
-            echo "Missing nt36572_common driver. Attempting to clone..."
-            git clone https://github.com/xiaomi-touchscreen-drivers/nt36572_common.git drivers/input/touchscreen/nt36572_common || true
-          fi
-          ls -la drivers/input/touchscreen/
 
       - name: Compile Kernel with KernelSU
         run: |
+          export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
           make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
           make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
