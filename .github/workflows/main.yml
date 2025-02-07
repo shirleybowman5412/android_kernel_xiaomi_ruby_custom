@@ -1,0 +1,58 @@
+name: KernelSU Build for Redmi Note 12 Pro Plus
+
+on:
+  push:
+    branches:
+      - "12.1"  # Change if needed
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+
+      - name: Clone KernelSU
+        run: |
+          git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
+          ls -la KernelSU  # Debug: Check contents
+
+      - name: Merge KernelSU into Kernel Tree
+        run: |
+          if [ -d "KernelSU/kernel/include" ]; then
+            cp -r KernelSU/kernel/include ./include
+          elif [ -d "KernelSU/include" ]; then
+            cp -r KernelSU/include ./include
+          else
+            echo "Error: KernelSU 'include' folder not found!"
+            exit 1
+          fi
+          cp -r KernelSU/kernel/drivers ./drivers || echo "Warning: No drivers copied."
+
+      - name: Setup Clang Toolchain
+        run: |
+          mkdir -p toolchains && cd toolchains
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main.tar.gz -O clang.tar.gz
+          tar -xzf clang.tar.gz
+          cd ..
+
+      - name: Set Environment Variables
+        run: |
+          echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
+          echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains" >> $GITHUB_ENV
+
+      - name: Compile Kernel with KernelSU
+        run: |
+          export PATH=$TOOLCHAIN_DIR/bin:$PATH
+          mkdir -p $KERNEL_OUT
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+
+      - name: Upload Compiled Kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-Built
+          path: ${{ env.KERNEL_OUT }}/arch/arm64/boot/Image.gz-dtb
