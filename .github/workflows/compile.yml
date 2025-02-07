@@ -14,6 +14,11 @@ jobs:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
 
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential flex bison clang lld libssl-dev libelf-dev libncurses-dev
+
       - name: Clone KernelSU
         run: |
           git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
@@ -28,7 +33,7 @@ jobs:
       - name: Clone Proton Clang Toolchain
         run: |
           mkdir -p toolchains && cd toolchains
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang proton-clang
           cd ..
 
       - name: Set Environment Variables
@@ -37,12 +42,22 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
 
+      - name: Debug Toolchain Path
+        run: |
+          echo "Toolchain path: $TOOLCHAIN_DIR"
+          ls -la $TOOLCHAIN_DIR
+
+      - name: Clean Build Directory
+        run: |
+          make mrproper
+          make O=$KERNEL_OUT clean
+
       - name: Compile Kernel with KernelSU
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+          make O=$KERNEL_OUT ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
 
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
