@@ -25,11 +25,10 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Setup Proton Clang Toolchain (Faster)
+      - name: Clone Proton Clang Toolchain
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://github.com/kdrag0n/proton-clang/releases/download/20210522/proton-clang.tar.gz -O clang.tar.gz
-          tar -xzf clang.tar.gz
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git
           cd ..
 
       - name: Set Environment Variables
