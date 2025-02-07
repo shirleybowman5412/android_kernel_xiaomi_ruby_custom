@@ -14,13 +14,6 @@ jobs:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential flex bison \
-            clang lld libssl-dev libelf-dev libncurses-dev \
-            libc6 libstdc++6 zlib1g-dev
-
       - name: Clone KernelSU
         run: |
           git clone --depth=1 https://github.com/tiann/KernelSU KernelSU
@@ -32,10 +25,11 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Clone Latest Proton Clang
+      - name: Setup Proton Clang Toolchain (Fixed Link)
         run: |
           mkdir -p toolchains && cd toolchains
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang proton-clang
+          wget https://github.com/kdrag0n/proton-clang/releases/download/20221210/proton-clang.tar.gz -O clang.tar.gz
+          tar -xzf clang.tar.gz
           cd ..
 
       - name: Set Environment Variables
@@ -43,19 +37,21 @@ jobs:
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+          echo "PATH=$TOOLCHAIN_DIR/bin:$PATH" >> $GITHUB_ENV
 
-      - name: Clean Kernel Build Directory
+      - name: Check & Fix Missing Touchscreen Driver
         run: |
-          make mrproper
-          make clean
+          if [ ! -d "drivers/input/touchscreen/nt36572_common" ]; then
+            echo "Missing nt36572_common driver. Attempting to clone..."
+            git clone https://github.com/xiaomi-touchscreen-drivers/nt36572_common.git drivers/input/touchscreen/nt36572_common || true
+          fi
+          ls -la drivers/input/touchscreen/
 
       - name: Compile Kernel with KernelSU
         run: |
-          export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
-          make O=$KERNEL_OUT ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
-          make O=$KERNEL_OUT ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
 
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
