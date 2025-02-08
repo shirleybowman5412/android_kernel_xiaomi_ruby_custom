@@ -47,7 +47,8 @@ jobs:
       - name: Create boot.img
         run: |
           mkdir -p boot
-          wget https://android.googlesource.com/platform/system/tools/mkbootimg/+/refs/heads/main/mkbootimg.py?format=TEXT -O mkbootimg.py
+          # Use raw URL for mkbootimg.py
+          wget -qO mkbootimg.py https://android.googlesource.com/platform/system/tools/mkbootimg/+/refs/heads/main/mkbootimg.py?format=TEXT
           chmod +x mkbootimg.py
           python3 mkbootimg.py \
             --kernel $KERNEL_OUT/arch/arm64/boot/Image.gz-dtb \
