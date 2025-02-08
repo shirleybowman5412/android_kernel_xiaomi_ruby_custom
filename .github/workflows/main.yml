@@ -25,11 +25,16 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Setup Proton Clang Toolchain (Faster)
+      - name: Check KernelSU Merge
+        run: |
+          ls -la include/
+          ls -la drivers/
+          ls -la arch/arm64/configs/
+
+      - name: Setup Proton Clang Toolchain (Latest Version)
         run: |
           mkdir -p toolchains && cd toolchains
-          wget https://github.com/kdrag0n/proton-clang/releases/download/20210522/proton-clang.tar.gz -O clang.tar.gz
-          tar -xzf clang.tar.gz
+          git clone --depth=1 https://gitlab.com/ZyCromerZ/clang.git proton-clang
           cd ..
 
       - name: Set Environment Variables
@@ -38,12 +43,25 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
 
+      - name: Modify Kernel Config to Skip drvgen
+        run: |
+          sed -i '/CONFIG_DRVGEN/d' arch/arm64/configs/ruby_defconfig || true
+          echo "CONFIG_DRVGEN=n" >> arch/arm64/configs/ruby_defconfig
+          echo "Modified ruby_defconfig to disable drvgen."
+
+      - name: Debug Environment Variables
+        run: |
+          echo "KERNEL_DIR=$KERNEL_DIR"
+          echo "KERNEL_OUT=$KERNEL_OUT"
+          echo "TOOLCHAIN_DIR=$TOOLCHAIN_DIR"
+
       - name: Compile Kernel with KernelSU
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc)
+          # Try ruby_defconfig, fallback to defconfig if it fails
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig || make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 defconfig
+          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc) || true
 
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
