@@ -58,14 +58,38 @@ jobs:
             --output boot/boot.img
           echo "boot.img successfully created!"
 
+      - name: Create TWRP Flashable ZIP
+        run: |
+          mkdir -p twrp_zip
+          cp boot/boot.img twrp_zip/
+          cat > twrp_zip/updater-script <<EOF
+          assert(getprop("ro.product.device") == "ruby");
+          ui_print("Flashing Kernel...");
+          package_extract_file("boot.img", "/dev/block/bootdevice/by-name/boot");
+          EOF
+          cd twrp_zip && zip -r ../KernelSU-Flashable.zip . && cd ..
+          echo "TWRP flashable zip created!"
+
       - name: Upload Boot Image
         uses: actions/upload-artifact@v4
         with:
           name: Boot-Image
           path: boot/boot.img
 
+      - name: Upload TWRP Flashable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-TWRP-Flashable
+          path: KernelSU-Flashable.zip
+
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
         with:
           name: KernelSU-Built
           path: ${{ env.KERNEL_OUT }}/arch/arm64/boot/Image.gz-dtb
+
+      - name: Upload All Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: All-Build-Artifacts
+          path: $KERNEL_OUT/**
