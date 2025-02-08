@@ -30,7 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y device-tree-compiler bc bison flex libssl-dev \
                                   git wget cpio unzip curl build-essential \
-                                  python3 python3-pip python3-venv ccache
+                                  python3 python3-pip python3-venv ccache \
+                                  libncurses-dev libelf-dev
 
       - name: Setup Google Clang Toolchain (Latest AOSP Version)
         run: |
@@ -44,21 +45,27 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
 
-      - name: Update Submodules (if any)
+      - name: Patch Makefile.clean to Skip Missing Directory
         run: |
-          git submodule update --init --recursive
+          sed -i '/nt36572_common/d' scripts/Makefile.clean
+
+      - name: Clean Build Environment
+        run: |
+          make mrproper
+          rm -rf out/  # Remove the output directory if it exists
+          rm -f .config include/config/auto.conf include/generated/autoconf.h
+
+      - name: Verify Kernel Configuration
+        run: |
+          make O=$KERNEL_OUT ARCH=arm64 LLVM=1 ruby_defconfig
+          grep -r "nt36572_common" $KERNEL_OUT/.config || true
 
       - name: Prepare Kernel Build
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
-          make mrproper
           touch scripts/dtc/drvgen  # Fix missing drvgen issue
           dtc --version  # Verify Device Tree Compiler installation
-
-      - name: Disable Touchscreen Driver (Optional, if not needed)
-        run: |
-          sed -i '/nt36572_common/d' drivers/input/touchscreen/Makefile  # Remove driver if not required
 
       - name: Compile Kernel with KernelSU
         run: |
