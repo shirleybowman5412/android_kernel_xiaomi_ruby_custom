@@ -56,6 +56,10 @@ jobs:
           touch scripts/dtc/drvgen  # Fix missing drvgen issue
           dtc --version  # Verify Device Tree Compiler installation
 
+      - name: Disable Touchscreen Driver (Optional, if not needed)
+        run: |
+          sed -i '/nt36572_common/d' drivers/input/touchscreen/Makefile  # Remove driver if not required
+
       - name: Compile Kernel with KernelSU
         run: |
           make O=$KERNEL_OUT ARCH=arm64 LLVM=1 \
