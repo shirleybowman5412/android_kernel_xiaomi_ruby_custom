@@ -44,12 +44,15 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
 
+      - name: Update Submodules (if any)
+        run: |
+          git submodule update --init --recursive
+
       - name: Prepare Kernel Build
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
           make mrproper
-          make O=$KERNEL_OUT clean
           touch scripts/dtc/drvgen  # Fix missing drvgen issue
           dtc --version  # Verify Device Tree Compiler installation
 
