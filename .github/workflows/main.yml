@@ -45,12 +45,17 @@ jobs:
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
           echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
 
+      - name: Fix Missing Directory Issue
+        run: |
+          mkdir -p drivers/input/touchscreen/nt36572_common
+          touch drivers/input/touchscreen/nt36572_common/Makefile
+
       - name: Prepare Kernel Build
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
           make mrproper
-          make O=$KERNEL_OUT clean
+          make O=$KERNEL_OUT mrproper  # Use mrproper instead of clean
           touch scripts/dtc/drvgen  # Fix missing drvgen issue
           dtc --version  # Verify Device Tree Compiler installation
 
