@@ -34,7 +34,7 @@ jobs:
       - name: Setup Proton Clang Toolchain (Latest Version)
         run: |
           mkdir -p toolchains && cd toolchains
-          git clone --depth=1 https://gitlab.com/ZyCromerZ/clang.git proton-clang
+          git clone --depth=1 https://github.com/ZyCromerZ/proton-clang.git proton-clang
           cd ..
 
       - name: Set Environment Variables
