@@ -25,46 +25,90 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
-      - name: Check KernelSU Merge
+      - name: Install Dependencies (DTC, Clang, etc.)
         run: |
-          ls -la include/
-          ls -la drivers/
-          ls -la arch/arm64/configs/
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler bc bison flex libssl-dev \
+                                  git wget cpio unzip curl build-essential \
+                                  python3 python3-pip python3-venv ccache \
+                                  libncurses-dev libelf-dev
 
-      - name: Setup Proton Clang Toolchain (Latest Version)
+      - name: Setup Google Clang Toolchain (Latest AOSP Version)
         run: |
           mkdir -p toolchains && cd toolchains
-          git clone --depth=1 https://gitlab.com/ZyCromerZ/clang.git proton-clang
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang
           cd ..
 
       - name: Set Environment Variables
         run: |
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
-          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/proton-clang" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
 
-      - name: Modify Kernel Config to Skip drvgen
-        run: |
-          sed -i '/CONFIG_DRVGEN/d' arch/arm64/configs/ruby_defconfig || true
-          echo "CONFIG_DRVGEN=n" >> arch/arm64/configs/ruby_defconfig
-          echo "Modified ruby_defconfig to disable drvgen."
-
-      - name: Debug Environment Variables
-        run: |
-          echo "KERNEL_DIR=$KERNEL_DIR"
-          echo "KERNEL_OUT=$KERNEL_OUT"
-          echo "TOOLCHAIN_DIR=$TOOLCHAIN_DIR"
-
-      - name: Compile Kernel with KernelSU
+      - name: Prepare Kernel Build
         run: |
           export PATH=$TOOLCHAIN_DIR/bin:$PATH
           mkdir -p $KERNEL_OUT
-          # Try ruby_defconfig, fallback to defconfig if it fails
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 ruby_defconfig || make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 defconfig
-          make O=$KERNEL_OUT ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc) || true
+          make mrproper
+          make O=$KERNEL_OUT clean
+          touch scripts/dtc/drvgen  # Fix missing drvgen issue
+          dtc --version  # Verify Device Tree Compiler installation
+
+      - name: Compile Kernel with KernelSU
+        run: |
+          make O=$KERNEL_OUT ARCH=arm64 LLVM=1 \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+              CLANG_TRIPLE=aarch64-linux-gnu- \
+              ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 LLVM=1 -j$(nproc) Image.gz-dtb
+
+      - name: Create boot.img
+        run: |
+          mkdir -p boot
+          wget -qO mkbootimg.py https://android.googlesource.com/platform/system/tools/mkbootimg/+/refs/heads/main/mkbootimg.py?format=TEXT
+          chmod +x mkbootimg.py
+          python3 mkbootimg.py \
+            --kernel $KERNEL_OUT/arch/arm64/boot/Image.gz-dtb \
+            --ramdisk /dev/null \
+            --cmdline "console=ttyMSM0,115200n8 earlycon=msm_serial_dm,0xC170000" \
+            --base 0x80000000 \
+            --pagesize 4096 \
+            --output boot/boot.img
+          echo "boot.img successfully created!"
+
+      - name: Create TWRP Flashable ZIP
+        run: |
+          mkdir -p twrp_zip
+          cp boot/boot.img twrp_zip/
+          cat > twrp_zip/updater-script <<EOF
+          assert(getprop("ro.product.device") == "ruby");
+          ui_print("Flashing Kernel...");
+          package_extract_file("boot.img", "/dev/block/bootdevice/by-name/boot");
+          EOF
+          cd twrp_zip && zip -r ../KernelSU-Flashable.zip . && cd ..
+          echo "TWRP flashable zip created!"
+
+      - name: Upload Boot Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Boot-Image
+          path: boot/boot.img
+
+      - name: Upload TWRP Flashable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-TWRP-Flashable
+          path: KernelSU-Flashable.zip
 
       - name: Upload Compiled Kernel
         uses: actions/upload-artifact@v4
         with:
           name: KernelSU-Built
           path: ${{ env.KERNEL_OUT }}/arch/arm64/boot/Image.gz-dtb
+
+      - name: Upload All Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: All-Build-Artifacts
+          path: $KERNEL_OUT/**
