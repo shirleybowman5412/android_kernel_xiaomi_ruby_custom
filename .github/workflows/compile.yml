@@ -25,34 +25,47 @@ jobs:
           cp -r KernelSU/drivers/* drivers/ || true
           echo "KernelSU merged successfully!"
 
+      - name: Install Dependencies (DTC, Clang, etc.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler bc bison flex libssl-dev \
+                                  git wget cpio unzip curl build-essential \
+                                  python3 python3-pip python3-venv ccache
+
       - name: Setup Google Clang Toolchain (Latest AOSP Version)
         run: |
           mkdir -p toolchains && cd toolchains
           git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 clang
-          export TOOLCHAIN_DIR=$(pwd)/clang/linux-x86/clang-r*/bin
           cd ..
 
       - name: Set Environment Variables
         run: |
           echo "KERNEL_DIR=$(pwd)" >> $GITHUB_ENV
           echo "KERNEL_OUT=$(pwd)/out" >> $GITHUB_ENV
-          echo "TOOLCHAIN_DIR=$TOOLCHAIN_DIR" >> $GITHUB_ENV
+          echo "TOOLCHAIN_DIR=$(pwd)/toolchains/clang" >> $GITHUB_ENV
+
+      - name: Prepare Kernel Build
+        run: |
+          export PATH=$TOOLCHAIN_DIR/bin:$PATH
+          mkdir -p $KERNEL_OUT
+          make mrproper
+          make O=$KERNEL_OUT clean
+          touch scripts/dtc/drvgen  # Fix missing drvgen issue
+          dtc --version  # Verify Device Tree Compiler installation
 
       - name: Compile Kernel with KernelSU
         run: |
-          export PATH=$TOOLCHAIN_DIR:$PATH
-          mkdir -p $KERNEL_OUT
           make O=$KERNEL_OUT ARCH=arm64 LLVM=1 \
               CROSS_COMPILE=aarch64-linux-gnu- \
               CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
               CLANG_TRIPLE=aarch64-linux-gnu- \
-              defconfig
-          make O=$KERNEL_OUT ARCH=arm64 LLVM=1 -j$(nproc)
+              ruby_defconfig
+          make O=$KERNEL_OUT ARCH=arm64 LLVM=1 -j$(nproc) Image.gz-dtb
 
       - name: Create boot.img
         run: |
           mkdir -p boot
-          wget -qO mkbootimg.py https://raw.githubusercontent.com/LineageOS/android_system_tools_mkbootimg/lineage-20/mkbootimg.py
+          wget -qO mkbootimg.py https://android.googlesource.com/platform/system/tools/mkbootimg/+/refs/heads/main/mkbootimg.py?format=TEXT
           chmod +x mkbootimg.py
           python3 mkbootimg.py \
             --kernel $KERNEL_OUT/arch/arm64/boot/Image.gz-dtb \
@@ -65,13 +78,13 @@ jobs:
 
       - name: Create TWRP Flashable ZIP
         run: |
-          mkdir -p twrp_zip/META-INF/com/google/android
-          cat > twrp_zip/META-INF/com/google/android/updater-script <<EOF
+          mkdir -p twrp_zip
+          cp boot/boot.img twrp_zip/
+          cat > twrp_zip/updater-script <<EOF
           assert(getprop("ro.product.device") == "ruby");
           ui_print("Flashing Kernel...");
           package_extract_file("boot.img", "/dev/block/bootdevice/by-name/boot");
           EOF
-          cp boot/boot.img twrp_zip/
           cd twrp_zip && zip -r ../KernelSU-Flashable.zip . && cd ..
           echo "TWRP flashable zip created!"
 
